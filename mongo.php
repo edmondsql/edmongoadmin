@@ -7,7 +7,6 @@ session_start();
 $bg=2;
 $step=20;
 $version="1.0";
-$deny=['admin','config','local'];
 class DBT {
 	private static $instance=NULL;
 	protected $_cnx,$db,$bw,$wc;
@@ -27,16 +26,14 @@ class DBT {
 		$qry=new MongoDB\Driver\Query($filter,$option);
 		return $this->_cnx->executeQuery($con,$qry)->toArray();
 	}
-	protected function prepare($time) {
+	protected function prepare($time=1000) {
 		$this->wc=new MongoDB\Driver\WriteConcern(MongoDB\Driver\WriteConcern::MAJORITY,$time);
 		$this->bw=new MongoDB\Driver\BulkWrite;
 	}
 	public function insert($con,$doc) {
-		$this->prepare(1000);
+		$this->prepare();
 		if(count($doc) != count($doc,COUNT_RECURSIVE)) {
-			foreach ($doc as $dc) {
-				$this->bw->insert($dc);
-			}
+			foreach ($doc as $dc) $this->bw->insert($dc);
 		} else {
 			$this->bw->insert($doc);
 		}
@@ -44,13 +41,13 @@ class DBT {
 		return $result->getInsertedCount();
 	}
 	public function update($con,$filter,$doc) {
-		$this->prepare(1000);
-		$this->bw->update($filter, $doc, ['multi'=>true,'upsert'=>false]);
+		$this->prepare();
+		$this->bw->update($filter,$doc,['multi'=>true,'upsert'=>false]);
 		$result=$this->execute($con);
 		return $result->getModifiedCount();
 	}
 	public function delete($con,$doc=[]) {
-		$this->prepare(1000);
+		$this->prepare();
 		$this->bw->delete($doc,['limit'=>0]);
 		$result=$this->execute($con);
 		return $result->getDeletedCount();
@@ -71,23 +68,17 @@ class DBT {
 		return $doc;
 	}
 	public function convert_bin($doc) {
-		if($doc instanceof MongoDB\BSON\Binary) {
-			$doc=json_decode(json_encode($doc),true)['$binary'];
-		} else {
-			$doc=json_encode($doc);
-		}
-		return $doc;
+		return ($doc instanceof MongoDB\BSON\Binary) ? json_decode(json_encode($doc),true)['$binary']:json_encode($doc);
 	}
 	public function convert_arr($doc) {
-		$doc=json_encode($doc);
-		return $doc;
+		return json_encode($doc);
 	}
 	public function num_row($con,$filter=[],$option=[]) {
 		return count($this->select($con, $filter, $option));
 	}
 }
 class ED {
-	public $con,$sg,$path,$type;
+	public $con,$sg,$path,$type,$deny=['admin','config','local'];
 	public function __construct() {
 		$pi=(isset($_SERVER['PATH_INFO']) ? $_SERVER['PATH_INFO'] : @getenv('PATH_INFO'));
 		$this->sg=preg_split('!/!',$pi,-1,PREG_SPLIT_NO_EMPTY);
@@ -197,16 +188,16 @@ class ED {
 		$this->con->commands('admin',['ping'=>1]);
 		$this->listdb();
 		} catch(Exception $e) {
-		$this->redir("50",['err'=>"Incorrect credentials"]);
+		$this->redir("50",['err'=>"Can't connect to the server"]);
 		}
 		$h='HTTP_X_REQUESTED_WITH';
 		if(isset($_SERVER[$h]) && !empty($_SERVER[$h]) && strtolower($_SERVER[$h]) == 'xmlhttprequest') session_regenerate_id(true);
-		//exist db
+		//check db
 		if(in_array('1',$level)) {
 			$db=$this->sg[1];
 			in_array($db,$this->listdb()) ? "" : $this->redir("",['err'=>"Not authorized"]);
 		}
-		//exist tb
+		//check tb
 		if(in_array('2',$level)) {
 			$db=$this->sg[1];
 			$tb=$this->sg[2];
@@ -255,20 +246,26 @@ class ED {
 		foreach($this->listdb() as $udb) $str.="<option value='{$path}5/$udb'".($udb==$db?" selected":"").">$udb</option>";
 		$str.="</optgroup></select>";
 
-		$q_ts=[];
+		$q_ts=$this->listCollection($db);
 		if($tb!="") {
 		$sl2="<select onchange='location=this.value;'>";
-		$q_ts=$this->listCollection($db);
 		$sl2.='<optgroup label="collections">';
-		foreach($q_ts as $k=>$r_ts) {
-		$sl2.="<option value='{$path}20/$db/".$k."'".($k==$tb?" selected":"").">".$k."</option>";
-		}
+		foreach($q_ts as $k=>$r_ts) $sl2.="<option value='{$path}20/$db/".$k."'".($k==$tb?" selected":"").">".$k."</option>";
 		$str.=$sl2."</optgroup></select>".((!empty($_SESSION["_mosearch_{$db}_{$tb}"]) && $this->sg[0]==20) ? " [<a href='{$path}24/$db/$tb/reset'>reset search</a>]":"");
 		}
 		$str.="</div>";
 		}
 
 		$str.="<div class='container'>";
+		if($left==1) {
+		if(!in_array($db,$this->deny)) {
+		$tbl='';
+		foreach($q_ts as $k=>$r_tb) if($r_tb!='view' && substr($k,0,7)!='system.') $tbl.="<option value='$k'>$k</option>";
+		$str.="<div class='col1'>".$this->form("2")."<input type='hidden' name='dbn' value='$db'/><input type='text' name='colln' placeholder='Collection'/><br/><button type='submit'>Create</button></form>".$this->form("30/$db",1)."<h3>Import</h3><small>json, xml, gz, zip</small><br/><input type='file' name='importfile' /><br/><button type='submit'>Import</button></form>".$this->form("9/$db")."<h3>Rename Collection</h3><select name='oldtb'>$tbl</select><br/><input type='text' name='newtb' placeholder='New Name' /><br/><button type='submit'>Rename</button></form>".$this->form("9/$db")."<h3>Create View</h3><select name='tbl'>$tbl</select><br/><input type='text' name='vn' placeholder='View Name' /><br/><input type='text' name='fld' placeholder='Romove fields (comma separated)' /><br/><button type='submit'>Create</button></form></div><div class='col2'>";
+		} else {
+		$str.="<div class='col3'>";
+		}
+		}
 		if($left==2) $str.="<div class='col3'>";
 		if($left==3) $str.="<div class='col4'>";
 		return $str;
@@ -381,11 +378,13 @@ textarea{white-space:pre-wrap}
 .ok{background:#efe;color:#080;border-bottom:2px solid #080}
 .err{background:#fee;color:#f00;border-bottom:2px solid #f00}
 .l1,th,button{background:#9be}
-.l2,.c1,h3{background:#cdf}
+.l2,.c1,.col1,h3{background:#cdf}
 .c2,.mn ul{background:#fff}
 .l3,tr:hover.r,button:hover{background:#fe3 !important}
 .ok,.err,.l2 li,.mn>li{display:inline-block;zoom:1}
-.dw{width:180px}
+.col1,.col2{display:table-cell}
+.col1{vertical-align:top;padding:3px}
+.col1,.dw{width:180px}
 .col2 table{margin:3px}
 .col3 table,.col4 table,.dw{margin:3px auto}
 .auto button,.auto input,.auto select{width:auto}
@@ -405,7 +404,7 @@ switch($ed->sg[0]) {
 default:
 case ""://show DBs
 	$ed->check();
-	echo $head.$ed->menu()."<div class='col3'><table><tr><td colspan='3' class='auto'>".$ed->form("2")."<input type='text' name='dbn' placeholder='Database'/><input type='text' name='colln' placeholder='Collection'/><button type='submit'>Create</button></form></td></tr><tr><th>Database</th><th>Collection</th><th>Actions</th></tr>";
+	echo $head.$ed->menu()."<div class='col1'>".$ed->form("2")."<input type='text' name='dbn' placeholder='Database'/><br/><input type='text' name='colln' placeholder='Collection'/><br/><button type='submit'>Create</button></form></div><div class='col2'><table><tr><th>Database</th><th>Collection</th><th>Actions</th></tr>";
 	foreach($ed->listdb() as $db) {
 		$bg=($bg==1)?2:1;
 		try {
@@ -430,9 +429,7 @@ case "2"://create db collection
 		$ed->redir("5/$db",['err'=>"Not authorized"]);
 		}
 		$ed->redir("5/$db",['ok'=>"Successfully created"]);
-	} else {
-		$ed->redir("",['err'=>"Fields must not be empty"]);
-	}
+	} else $ed->redir("",['err'=>"Fields must not be empty"]);
 break;
 
 case "4"://drop db
@@ -443,7 +440,7 @@ case "4"://drop db
 	else $ed->redir("",['err'=>"Can't drop DB"]);
 break;
 
-case "5"://show tables
+case "5"://show collections
 	$ed->check([1]);
 	$db=$ed->sg[1];
 	try {
@@ -455,13 +452,7 @@ case "5"://show tables
 	$pg=(empty($ed->sg[2]) || $ed->sg[2] > $totalpg) ? 1 : $ed->sg[2];
 	$offset=($pg - 1) * $step;
 	$q_tb=array_slice($q_tb,$offset,$offset+$step);
-	echo $head.$ed->menu($db,'',2)."<table>";
-	if(!in_array($db,$deny)) {
-	$tbl='';
-	foreach($q_tb as $k=>$r_tb) if($r_tb!='view' && substr($k,0,7)!='system.') $tbl.="<option value='$k'>$k</option>";
-	echo "<tr><td colspan='3' class='auto ce'>".$ed->form("2")."<input type='hidden' name='dbn' value='$db'/><input type='text' name='colln' placeholder='Collection'/><button type='submit'>Create</button></form></td></tr><tr><td colspan='3' class='auto ce l2'>".$ed->form("30/$db",1)."<b>Import</b> <small>json, xml, gz, zip</small><br/><input type='file' name='importfile' /><button type='submit'>Import</button></form></td></tr><tr><td colspan='3' class='ce'>".$ed->form("9/$db")."<b>Rename Collection</b><br/><select name='oldtb'>$tbl</select><br/><input type='text' name='newtb' placeholder='New Name' /><br/><button type='submit'>Rename</button></form></td></tr><tr><td colspan='3' class='ce'>".$ed->form("9/$db")."<b>Create View</b><br/><select name='tbl'>$tbl</select><br/><input type='text' name='vn' placeholder='View Name' /><br/><input type='text' name='fld' placeholder='Romove fields (comma separated)' /><br/><button type='submit'>Create</button></form></td></tr>";
-	}
-	echo "<tr><th>Collections</th><th>Rows</th><th>Actions</th></tr>";
+	echo $head.$ed->menu($db,'',1)."<table><tr><th>Collections</th><th>Rows</th><th>Actions</th></tr>";
 	foreach($q_tb as $k=>$r_tb) {
 		$bg=($bg==1)?2:1;
 		try{
@@ -534,18 +525,21 @@ case "15"://index
 	}
 	$q_r=$ed->con->select($db.'.'.$tb,[],['limit'=>1]);
 	$opt='';
+	if(!empty($q_r[0])) {
 	foreach((array)$q_r[0] as $k=>$r) {
 	if($k!='_id') $opt.="<option value='$k'>$k</option>";
 	}
-	echo $head.$ed->menu($db,$tb,2).$ed->form("15/$db/$tb")."<table><tr><td>Field</td><td><select name='field'>$opt</select></td></tr>
+	}
+	echo $head.$ed->menu($db,$tb,1);
+	if(!in_array($db,$ed->deny)) echo $ed->form("15/$db/$tb")."<table><tr><td>Field</td><td><select name='field'>$opt</select></td></tr>
 	<tr><td>Order</td><td><select name='order'><option value='1'>ASC</option><option value='-1'>DESC</option></select></td></tr>
 	<tr><td>Unique</td><td><select name='unique'><option value='0'>No</option><option value='1'>Yes</option></select></td></tr>
-	<tr><td colspan='2'><button type='submit'>Create</button></td></tr></table></form>
-	<table><tr><th>Name</th><th>Key</th><th>Order</th><th>Unique</th><th>Actions</th></tr>";
+	<tr><td colspan='2'><button type='submit'>Create</button></td></tr></table></form>";
+	echo "<table><tr><th>Name</th><th>Key</th><th>Order</th><th>Unique</th><th>Actions</th></tr>";
 	foreach($ed->con->commands($db,['listIndexes'=>$tb])->toArray() as $idx) {
 		$bg=($bg==1)?2:1;
 		$key=key($idx->key);
-		echo "<tr class='r c$bg'><td>{$idx->name}</td><td>".$key."</td><td>".($idx->key->$key==1 ? 'ASC':'DESC')."</td><td>".(empty($idx->unique)?'No':'Yes')."</td><td>".($idx->name=="_id_" ? "Primary":"<a href='{$ed->path}15/$db/$tb/".$idx->name."'>Drop</a>")."</td></tr>";
+		echo "<tr class='r c$bg'><td>{$idx->name}</td><td>".$key."</td><td>".($idx->key->$key==1 ? 'ASC':'DESC')."</td><td>".(empty($idx->unique)?'No':'Yes')."</td><td>".($idx->name=="_id_" ? "Primary":(in_array($db,$ed->deny)?"":"<a href='{$ed->path}15/$db/$tb/".$idx->name."'>Drop</a>"))."</td></tr>";
 	}
 	echo "</table>";
 break;
@@ -567,7 +561,7 @@ case "20"://browse
 	$offset=($pg - 1) * $step;
 	$q_rw=$ed->con->select($db.'.'.$tb,$where,array_merge(['skip'=>$offset,'limit'=>$step],$opt));
 
-	echo $head.$ed->menu($db,$tb,3)."<table>";
+	echo $head.$ed->menu($db,$tb,1)."<table>";
 	if($ed->type!='view') echo "<tr><td colspan='2'>".$ed->form("21/$db/$tb")."<textarea placeholder='{\"json\":\"format\"}' name='json'></textarea><br/><button type='submit'>Insert</button></form></td></tr>";
 	if(count($q_rw)>0) {
 	foreach($q_rw as $row) {
@@ -615,9 +609,7 @@ case "21"://insert
 		if($ed->isJson($ed->post('json'))!=true) $ed->redir("20/$db/$tb",['err'=>"Data format is not json"]);
 		$ed->con->insert($db.'.'.$tb,json_decode($ed->post('json'),true));
 		$ed->redir("20/$db/$tb",['ok'=>"Successfully saved"]);
-	} else {
-		$ed->redir("20/$db/$tb",['err'=>"Empty data"]);
-	}
+	} else $ed->redir("20/$db/$tb",['err'=>"Empty data"]);
 break;
 
 case "22"://edit
@@ -643,7 +635,7 @@ case "22"://edit
 		else $ed->redir("20/$db/$tb",['err'=>"Update failed"]);
 	} else {
 		unset($q_rd[0]->_id);
-		echo $head.$ed->menu($db,$tb,3).$ed->form("22/$db/$tb/$id/$oid")."<table>
+		echo $head.$ed->menu($db,$tb,1).$ed->form("22/$db/$tb/$id/$oid")."<table>
 		<tr><td><textarea name='json'>".json_encode($q_rd)."</textarea></td></tr>
 		<tr><td><button type='submit' name='edit'>Update</button></td></tr></table></form>";
 	}
@@ -675,7 +667,7 @@ case "24"://search
 	$_SESSION[$sr]['sort']=$ed->post('sort');
 	$ed->redir("20/$db/$tb");
 	}
-	echo $head.$ed->menu($db,$tb,2).$ed->form("24/$db/$tb");
+	echo $head.$ed->menu($db,$tb,1).$ed->form("24/$db/$tb");
 	echo "<table><tr><td colspan='2'><textarea placeholder='{\"json\":\"format\"}' name='search'></textarea></td></tr>
 	<tr class='c1'><td><input type='text' name='field' placeholder='Field name'/></td>
 	<td><select name='sort'><option value='1'>ASC</option><option value='-1'>DESC</option></select></td></tr>
@@ -695,7 +687,7 @@ case "26"://drop collection
 	$db=$ed->sg[1];
 	$tb=$ed->sg[2];
 	$tbs=$ed->listCollection($db);
-	$ed->con->commands($db, ["drop"=>$tb]);
+	$ed->con->commands($db,["drop"=>$tb]);
 	$ed->redir((count($tbs)<2?"":"5/$db"),['ok'=>"Successfully dropped"]);
 break;
 
@@ -778,7 +770,7 @@ case "30"://import
 			}
 		}
 	}
-	echo $head.$ed->menu($db)."<div class='col2'>";
+	echo $head.$ed->menu($db,'',1);
 	if(!empty($e) && is_array($e)) {
 	$e=call_user_func_array('array_merge',$e);
 	foreach($e as $k=>$q) {
@@ -792,9 +784,7 @@ case "31"://export form
 	$ed->check([1]);
 	$db=$ed->sg[1];
 	$q_tb=$ed->listCollection($db);
-	if(count($q_tb) < 1) {
-	$ed->redir("5/$db",["err"=>"No export empty DB"]);
-	}
+	if(count($q_tb) < 1) $ed->redir("5/$db",["err"=>"No export empty DB"]);
 	echo $head.$ed->menu($db,'',2).$ed->form("32/$db")."<div class='dw'><h3 class='l1'>Export</h3><h3>Select collection(s)</h3>
 	<p><input type='checkbox' onclick='selectall(this,\"tbs\");dbx()' /> All/None</p>
 	<select id='tbs' name='tbs[]' multiple='multiple' onchange='dbx()'>";
@@ -803,14 +793,10 @@ case "31"://export form
 	}
 	echo "</select><h3>File format</h3>";
 	$ffo=['json'=>'JSON','xml'=>'XML'];
-	foreach($ffo as $k=> $ff) {
-	echo "<p><input type='radio' name='ffmt[]' onclick='opt()' value='$k'".($k=='json' ? ' checked':'')." /> $ff</p>";
-	}
+	foreach($ffo as $k=> $ff) echo "<p><input type='radio' name='ffmt[]' onclick='opt()' value='$k'".($k=='json' ? ' checked':'')." /> $ff</p>";
 	echo "<h3>File compression</h3><p><select name='ftype'>";
 	$fty=['plain'=>'None','zip'=>'Zip','gz'=>'GZ'];
-	foreach($fty as $k=> $ft) {
-	echo "<option value='$k'>$ft</option>";
-	}
+	foreach($fty as $k=> $ft) echo "<option value='$k'>$ft</option>";
 	echo "</select></p><button type='submit' name='exp'>Export</button></div></form>";
 break;
 
@@ -990,9 +976,7 @@ case "52"://users
 		$users=$ed->con->select($db.'.system.users');
 		foreach($users as $user) {
 		$r=[];
-		foreach($user->roles as $rl) {
-		$r[]=$rl->role;
-		}
+		foreach($user->roles as $rl) $r[]=$rl->role;
 		$udb=$user->db;
 		$user=$user->user;
 		$r=implode(",",$r);
@@ -1014,9 +998,7 @@ case "53"://add,edit,update user
 	$user=$user?:$ed->post('username');
 	if(empty($user) || empty($r) || $ed->post('password','e')) $ed->redir('53',['err'=>"All fields required"]);
 	$roles=[];
-	foreach($r as $ro) {
-	array_push($roles,["role"=>$ro,"db"=>$dbu]);
-	}
+	foreach($r as $ro) array_push($roles,["role"=>$ro,"db"=>$dbu]);
 	$op=($db==''?"createUser":"updateUser");
 	$pwd=["pwd"=>$ed->post('password')];
 	$usr=[$op=>$user,"roles"=>$roles];
@@ -1033,9 +1015,9 @@ case "53"://add,edit,update user
 		echo "<option value='$rl'".(in_array($rl,$r)?" selected":"").">$rl</option>";
 	}
 	echo "</select></td></tr><tr><td>DB </td><td><select name='db'".($db==''?'':' disabled').">";
-	array_shift($deny);
+	array_shift($ed->deny);
 	foreach($ed->listdb() as $dbs) {
-		if(!in_array($dbs,$deny)) echo "<option value='$dbs'".($dbs==$db?" selected":"").">$dbs</option>";
+		if(!in_array($dbs,$ed->deny)) echo "<option value='$dbs'".($dbs==$db?" selected":"").">$dbs</option>";
 	}
 	echo "</select></td></tr><tr><td colspan='2' class='c1'><button type='submit' name='save'>Save</button></td></tr></table>";
 break;
