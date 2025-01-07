@@ -524,14 +524,8 @@ case "15"://index
 		}
 	}
 	$q_r=$ed->con->select($db.'.'.$tb,[],['limit'=>1]);
-	$opt='';
-	if(!empty($q_r[0])) {
-	foreach((array)$q_r[0] as $k=>$r) {
-	if($k!='_id') $opt.="<option value='$k'>$k</option>";
-	}
-	}
 	echo $head.$ed->menu($db,$tb,1);
-	if(!in_array($db,$ed->deny)) echo $ed->form("15/$db/$tb")."<table><tr><td>Field</td><td><select name='field'>$opt</select></td></tr>
+	if(!in_array($db,$ed->deny)) echo $ed->form("15/$db/$tb")."<table><tr><td>Field</td><td><input type='text' name='field' /></td></tr>
 	<tr><td>Order</td><td><select name='order'><option value='1'>ASC</option><option value='-1'>DESC</option></select></td></tr>
 	<tr><td>Unique</td><td><select name='unique'><option value='0'>No</option><option value='1'>Yes</option></select></td></tr>
 	<tr><td colspan='2'><button type='submit'>Create</button></td></tr></table></form>";
