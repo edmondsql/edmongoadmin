@@ -435,9 +435,13 @@ break;
 case "4"://drop db
 	$ed->check([1]);
 	$db=$ed->sg[1];
-	$del=@$ed->con->commands($db,["dropDatabase"=>1]);
+	try {
+	$del=$ed->con->commands($db,["dropDatabase"=>1]);
 	if($del->toArray()[0]->ok == 1) $ed->redir("",['ok'=>"Successfully dropped"]);
 	else $ed->redir("",['err'=>"Can't drop DB"]);
+	} catch(Exception $e) {
+	$ed->redir("",['err'=>"Can't drop DB"]);
+	}
 break;
 
 case "5"://show collections
