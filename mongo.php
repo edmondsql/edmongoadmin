@@ -1,12 +1,11 @@
 <?php
 error_reporting(E_ALL);
-if(version_compare(PHP_VERSION,'7.0.0','<')) die('Require PHP 7.0 or higher');
 if(!extension_loaded('mongodb')) die('Install Mongodb extension!');
 session_name('Mongo');
 session_start();
 $bg=2;
 $step=20;
-$version="1.0";
+$version="1.1";
 class DBT {
 	private static $instance=NULL;
 	protected $_cnx,$db,$bw,$wc;
@@ -261,7 +260,7 @@ class ED {
 		if(!in_array($db,$this->deny)) {
 		$tbl='';
 		foreach($q_ts as $k=>$r_tb) if($r_tb!='view' && substr($k,0,7)!='system.') $tbl.="<option value='$k'>$k</option>";
-		$str.="<div class='col1'>".$this->form("2")."<input type='hidden' name='dbn' value='$db'/><input type='text' name='colln' placeholder='Collection'/><br/><button type='submit'>Create</button></form>".$this->form("30/$db",1)."<h3>Import</h3><small>json, xml, gz, zip</small><br/><input type='file' name='importfile' /><br/><button type='submit'>Import</button></form>".$this->form("9/$db")."<h3>Rename Collection</h3><select name='oldtb'>$tbl</select><br/><input type='text' name='newtb' placeholder='New Name' /><br/><button type='submit'>Rename</button></form>".$this->form("9/$db")."<h3>Create View</h3><select name='tbl'>$tbl</select><br/><input type='text' name='vn' placeholder='View Name' /><br/><input type='text' name='fld' placeholder='Romove fields (comma separated)' /><br/><button type='submit'>Create</button></form></div><div class='col2'>";
+		$str.="<div class='col1'>".$this->form("2")."<input type='hidden' name='dbn' value='$db'/><input type='text' name='colln' placeholder='Collection'/><br/><button type='submit'>Create</button></form>".$this->form("30/$db",1)."<h3>Import</h3><small>json, xml, gz, zip</small><br/><input type='file' name='importfile' /><br/><button type='submit'>Upload (&lt;".ini_get("upload_max_filesize")."B)</button></form>".$this->form("9/$db")."<h3>Rename Collection</h3><select name='oldtb'>$tbl</select><br/><input type='text' name='newtb' placeholder='New Name' /><br/><button type='submit'>Rename</button></form>".$this->form("9/$db")."<h3>Create View</h3><select name='tbl'>$tbl</select><br/><input type='text' name='vn' placeholder='View Name' /><br/><input type='text' name='fld' placeholder='Romove fields (comma separated)' /><br/><button type='submit'>Create</button></form></div><div class='col2'>";
 		} else {
 		$str.="<div class='col3'>";
 		}
@@ -348,7 +347,7 @@ $ed=new ED;
 $head='<!DOCTYPE html><html lang="en"><head>
 <title>EdMongoAdmin</title><meta charset="utf-8">
 <style>
-*{margin:0;padding:0;font-size:12px;color:#333;font-family:Arial}
+*{margin:0;padding:0;font-size:14px;color:#333;font-family:Arial}
 html{-ms-text-size-adjust:100%;-webkit-text-size-adjust:100%;background:#fff}
 html,textarea{overflow:auto}
 .container{overflow:auto;overflow-y:hidden;-ms-overflow-y:hidden;white-space:nowrap;scrollbar-width:thin}
@@ -645,9 +644,12 @@ case "23"://delete
 	$tb=$ed->sg[2];
 	$id=$ed->sg[3];
 	$oid=$ed->sg[4]??'';
-	$del=$ed->con->delete($db.'.'.$tb,['_id'=>$ed->con->convert_id($id,$oid)]);
-	if($del) $ed->redir("20/$db/$tb",['ok'=>"Successfully deleted"]);
-	else $ed->redir("20/$db/$tb",['err'=>"Delete failed"]);
+	try {
+	$ed->con->delete($db.'.'.$tb,['_id'=>$ed->con->convert_id($id,$oid)]);
+	$ed->redir("20/$db/$tb",['ok'=>"Successfully deleted"]);
+	} catch(Exception $e) {
+	$ed->redir("20/$db/$tb",['err'=>"Delete failed"]);
+	}
 break;
 
 case "24"://search
@@ -676,8 +678,12 @@ case "25"://empty collection
 	$ed->check([1,2]);
 	$db=$ed->sg[1];
 	$tb=$ed->sg[2];
+	try {
 	$ed->con->delete($db.'.'.$tb);
 	$ed->redir("20/$db/$tb",['ok'=>"Table is empty"]);
+	} catch(Exception $e) {
+	$ed->redir("20/$db/$tb",['err'=>"Empty failed"]);
+	}
 break;
 
 case "26"://drop collection
@@ -791,7 +797,7 @@ case "31"://export form
 	}
 	echo "</select><h3>File format</h3>";
 	$ffo=['json'=>'JSON','xml'=>'XML'];
-	foreach($ffo as $k=> $ff) echo "<p><input type='radio' name='ffmt[]' onclick='opt()' value='$k'".($k=='json' ? ' checked':'')." /> $ff</p>";
+	foreach($ffo as $k=> $ff) echo "<p><input type='radio' name='ffmt[]' value='$k'".($k=='json' ? ' checked':'')." /> $ff</p>";
 	echo "<h3>File compression</h3><p><select name='ftype'>";
 	$fty=['plain'=>'None','zip'=>'Zip','gz'=>'GZ'];
 	foreach($fty as $k=> $ft) echo "<option value='$k'>$ft</option>";
@@ -952,7 +958,7 @@ case "50"://login
 	session_unset();
 	session_destroy();
 	echo $head.$ed->menu('','',2).$ed->form("50")."<div class='dw'><h3>LOGIN</h3>
-	<div>Host<br/><input type='text' id='host' name='lhost' value='localhost:27017'/></div>
+	<div>Host<br/><input type='text' id='host' name='lhost' value='localhost'/></div>
 	<div>Username<br/><input type='text' name='username' value=''/></div>
 	<div>Password<br/><input type='password' name='password'/></div>
 	<div>Database<br/><input type='text' name='db'/></div>
