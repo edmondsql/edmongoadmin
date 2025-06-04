@@ -368,12 +368,12 @@ table a,.l1 a,.l2 a{padding:0 3px}
 table{border-collapse:collapse;border-spacing:0;border-bottom:1px solid #555}
 td,th{padding:4px;vertical-align:top}
 input[type=checkbox],input[type=radio]{position:relative;vertical-align:middle;bottom:1px}
-input[type=text],input[type=password],input[type=file],textarea,button,select{width:100%;padding:2px;border:1px solid #9be;outline:none;-webkit-border-radius:3px;-moz-border-radius:3px;border-radius:3px;-webkit-box-sizing:border-box;-moz-box-sizing:border-box;box-sizing:border-box}
+input[type=text],input[type=password],input[type=file],textarea,button,select{width:100%;padding:2px;border:1px solid #9be;outline:none;border-radius:3px;box-sizing:border-box}
 select{padding:1px 0}
 optgroup option{padding-left:8px}
 textarea{white-space:pre-wrap}
 .msg{position:absolute;top:0;right:0;z-index:9}
-.ok,.err{padding:8px;font-weight:bold;font-size:13px}
+.ok,.err{padding:8px;font-weight:bold;font-size:14px}
 .ok{background:#efe;color:#080;border-bottom:2px solid #080}
 .err{background:#fee;color:#f00;border-bottom:2px solid #f00}
 .l1,th,button{background:#9be}
@@ -1057,12 +1057,24 @@ $ed->con=null;
 unset($_POST,$_SESSION["ok"],$_SESSION["err"]);
 ?></div></div><div class="l1 ce"><a href="http://edmondsql.github.io">edmondsql</a></div>
 <script>
-let msg=document.querySelectorAll(".msg");
-document.querySelectorAll(".del").forEach(d=>{
+function byId(n){
+return document.getElementById(n);
+}
+function byName(n){
+return document.getElementsByName(n);
+}
+function byAll(n){
+return document.querySelectorAll(n);
+}
+function createEl(n){
+return document.createElement(n);
+}
+let msg=byAll(".msg");
+byAll(".del").forEach(d=>{
 d.addEventListener('click',(e)=>{
 e.preventDefault();
 msg.forEach(m=>m.remove());
-let hrf=e.target.getAttribute("href"),nMsg=document.createElement("div"),nOk=document.createElement("div"),nEr=document.createElement("div");
+let hrf=e.target.getAttribute("href"),nMsg=createEl("div"),nOk=createEl("div"),nEr=createEl("div");
 nMsg.className='msg';
 nOk.className='ok';nOk.innerText='Yes';
 nEr.className='err';nEr.innerText='No';
@@ -1079,18 +1091,18 @@ if(key==27||key==78)nMsg.remove();
 });
 msg.forEach(m=>{if(m.innerText!="")setTimeout(()=>{m.remove()},7000);m.addEventListener('dblclick',()=>m.remove())});
 function selectall(cb,lb){
-let i,multi=document.getElementById(lb);
+let i,multi=byId(lb);
 if(cb.checked) for(i=0;i<multi.options.length;i++) multi.options[i].selected=true;
 else multi.selectedIndex=-1;
 }
 function toggle(cb,el){
-let i,cbox=document.getElementsByName(el);
+let i,cbox=byName(el);
 for(i=0;i<cbox.length;i++) cbox[i].checked=cb.checked;
 }
 function dbx(){
-let ft=document.getElementsByName("ftype")[0],db=document.querySelectorAll("#tbs option:checked").length;
+let ft=byName("ftype")[0],db=byAll("#tbs option:checked").length;
 if(db<2 && ft[0].value!="plain"){
-let op=document.createElement("option");
+let op=createEl("option");
 op.value="plain";op.text="None";
 ft.options.add(op,0);
 ft.options[0].selected=true;
