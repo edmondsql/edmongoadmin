@@ -5,7 +5,7 @@ session_name('Mongo');
 session_start();
 $bg=2;
 $step=20;
-$version="1.1";
+$version="1.2";
 class DBT {
 	private static $instance=NULL;
 	protected $_cnx,$db,$bw,$wc;
@@ -345,7 +345,7 @@ class ED {
 }
 $ed=new ED;
 $head='<!DOCTYPE html><html lang="en"><head>
-<title>EdMongoAdmin</title><meta charset="utf-8">
+<meta charset="utf-8"><title>EdMongoAdmin</title>
 <style>
 *{margin:0;padding:0;font-size:14px;color:#333;font-family:Arial}
 html{-ms-text-size-adjust:100%;-webkit-text-size-adjust:100%;background:#fff}
@@ -358,8 +358,6 @@ html,textarea{overflow:auto}
 .ce{text-align:center}
 .pg *{margin:0 2px;width:auto}
 .l1 ul,.l2 ul{list-style:none}
-.left{float:left}
-.left button{margin:0 1px}
 h3{margin:2px 0 1px;padding:2px 0}
 a{color:#842;text-decoration:none}
 a:hover{text-decoration:underline}
@@ -373,7 +371,7 @@ select{padding:1px 0}
 optgroup option{padding-left:8px}
 textarea{white-space:pre-wrap}
 .msg{position:absolute;top:0;right:0;z-index:9}
-.ok,.err{padding:8px;font-weight:bold;font-size:14px}
+.ok,.err{padding:8px;font-weight:bold}
 .ok{background:#efe;color:#080;border-bottom:2px solid #080}
 .err{background:#fee;color:#f00;border-bottom:2px solid #f00}
 .l1,th,button{background:#9be}
@@ -388,11 +386,6 @@ textarea{white-space:pre-wrap}
 .col3 table,.col4 table,.dw{margin:3px auto}
 .auto button,.auto input,.auto select{width:auto}
 .l3.auto select{border:0;padding:0;background:#fe3}
-.sort tbody tr{cursor:default;position:relative}
-.handle{font:18px/12px Arial;vertical-align:middle}
-.handle:hover{cursor:move}
-.opacity{opacity:0.7}
-.drag{opacity:1;top:3px;left:0}
 .l1,.l2,.l3,.col4 table{width:100%}
 .msg,.a{cursor:pointer}
 </style>
@@ -1057,24 +1050,15 @@ $ed->con=null;
 unset($_POST,$_SESSION["ok"],$_SESSION["err"]);
 ?></div></div><div class="l1 ce"><a href="http://edmondsql.github.io">edmondsql</a></div>
 <script>
-function byId(n){
-return document.getElementById(n);
-}
-function byName(n){
-return document.getElementsByName(n);
-}
-function byAll(n){
-return document.querySelectorAll(n);
-}
-function createEl(n){
-return document.createElement(n);
-}
-let msg=byAll(".msg");
-byAll(".del").forEach(d=>{
+const $=(s)=>document.querySelector(s);
+const $$=(s)=>document.querySelectorAll(s);
+const $c=(s)=>document.createElement(s);
+let msg=$$(".msg");
+$$(".del").forEach(d=>{
 d.addEventListener('click',(e)=>{
 e.preventDefault();
 msg.forEach(m=>m.remove());
-let hrf=e.target.getAttribute("href"),nMsg=createEl("div"),nOk=createEl("div"),nEr=createEl("div");
+let hrf=e.target.getAttribute("href"),nMsg=$c("div"),nOk=$c("div"),nEr=$c("div");
 nMsg.className='msg';
 nOk.className='ok';nOk.innerText='Yes';
 nEr.className='err';nEr.innerText='No';
@@ -1091,18 +1075,14 @@ if(key==27||key==78)nMsg.remove();
 });
 msg.forEach(m=>{if(m.innerText!="")setTimeout(()=>{m.remove()},7000);m.addEventListener('dblclick',()=>m.remove())});
 function selectall(cb,lb){
-let i,multi=byId(lb);
+let i,multi=$('#'+lb);
 if(cb.checked) for(i=0;i<multi.options.length;i++) multi.options[i].selected=true;
 else multi.selectedIndex=-1;
 }
-function toggle(cb,el){
-let i,cbox=byName(el);
-for(i=0;i<cbox.length;i++) cbox[i].checked=cb.checked;
-}
 function dbx(){
-let ft=byName("ftype")[0],db=byAll("#tbs option:checked").length;
+let ft=$$('[name="ftype"]')[0],db=$$("#tbs option:checked").length;
 if(db<2 && ft[0].value!="plain"){
-let op=createEl("option");
+let op=$c("option");
 op.value="plain";op.text="None";
 ft.options.add(op,0);
 ft.options[0].selected=true;
