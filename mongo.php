@@ -19,7 +19,7 @@ class DBT {
 		$this->_cnx=new MongoDB\Driver\Manager($con);
 	}
 	public function commands($db,$cmd) {
-		return $this->_cnx->executeCommand($db, new MongoDB\Driver\Command($cmd));
+		return $this->_cnx->executeCommand($db,new MongoDB\Driver\Command($cmd));
 	}
 	public function select($con,$filter=[],$option=[]) {
 		$qry=new MongoDB\Driver\Query($filter,$option);
@@ -32,7 +32,7 @@ class DBT {
 	public function insert($con,$doc) {
 		$this->prepare();
 		if(count($doc) != count($doc,COUNT_RECURSIVE)) {
-			foreach ($doc as $dc) $this->bw->insert($dc);
+			foreach($doc as $dc) $this->bw->insert($dc);
 		} else {
 			$this->bw->insert($doc);
 		}
@@ -54,7 +54,7 @@ class DBT {
 	protected function execute($con) {
 		return $this->_cnx->executeBulkWrite($con,$this->bw,$this->wc);
 	}
-	public function convert_id($doc, $oid='') {
+	public function convert_id($doc,$oid='') {
 		if($doc instanceof MongoDB\BSON\ObjectId) {
 			$doc=$doc->__toString();
 		} elseif(is_numeric($doc)) {
@@ -73,7 +73,7 @@ class DBT {
 		return json_encode($doc);
 	}
 	public function num_row($con,$filter=[],$option=[]) {
-		return count($this->select($con, $filter, $option));
+		return count($this->select($con,$filter,$option));
 	}
 }
 class ED {
@@ -362,15 +362,14 @@ h3{margin:2px 0 1px;padding:2px 0}
 a{color:#842;text-decoration:none}
 a:hover{text-decoration:underline}
 a,a:active,a:hover{outline:0}
-table a,.l1 a,.l2 a{padding:0 3px}
+table a,.l1 a,.l2 a{padding:0 2px}
 table{border-collapse:collapse;border-spacing:0;border-bottom:1px solid #555}
 td,th{padding:4px;vertical-align:top}
 input[type=checkbox],input[type=radio]{position:relative;vertical-align:middle;bottom:1px}
 input[type=text],input[type=password],input[type=file],textarea,button,select{width:100%;padding:2px;border:1px solid #9be;outline:none;border-radius:3px;box-sizing:border-box}
-select{padding:1px 0}
 optgroup option{padding-left:8px}
-textarea{white-space:pre-wrap}
-.msg{position:absolute;top:0;right:0;z-index:9}
+textarea{white-space:pre-wrap;min-width:180px}
+.msg{position:fixed;top:0;right:0;z-index:9}
 .ok,.err{padding:8px;font-weight:bold}
 .ok{background:#efe;color:#080;border-bottom:2px solid #080}
 .err{background:#fee;color:#f00;border-bottom:2px solid #f00}
@@ -478,7 +477,7 @@ case "9":
 	if($ed->post('vn','!e')) {//create view
 		$flds=[];
 		if(!empty($ed->post('fld'))) {
-		$fld=explode(",", $ed->post('fld'));
+		$fld=explode(",",$ed->post('fld'));
 		foreach($fld as $fl) $flds[trim($fl)]=0;
 		}
 		$create=['create'=>$ed->sanitize($ed->post('vn')),'viewOn'=>$ed->post('tbl')];
@@ -513,7 +512,7 @@ case "15"://index
 	}
 	if(!empty($ed->sg[3])) {//drop
 		try {
-		$ed->con->commands($db,['dropIndexes'=>$tb, 'index'=>$ed->sg[3]]);
+		$ed->con->commands($db,['dropIndexes'=>$tb,'index'=>$ed->sg[3]]);
 		$ed->redir("15/$db/$tb",['ok'=>"Successfully dropped index"]);
 		} catch(Exception $e) {
 		$ed->redir("15/$db/$tb",['err'=>"Can't drop index"]);
@@ -528,7 +527,7 @@ case "15"://index
 	echo "<table><tr><th>Name</th><th>Key</th><th>Order</th><th>Unique</th><th>Actions</th></tr>";
 	foreach($ed->con->commands($db,['listIndexes'=>$tb])->toArray() as $idx) {
 		$bg=($bg==1)?2:1;
-		$key=key($idx->key);
+		$key=key((array)$idx->key);
 		echo "<tr class='r c$bg'><td>{$idx->name}</td><td>".$key."</td><td>".($idx->key->$key==1 ? 'ASC':'DESC')."</td><td>".(empty($idx->unique)?'No':'Yes')."</td><td>".($idx->name=="_id_" ? "Primary":(in_array($db,$ed->deny)?"":"<a href='{$ed->path}15/$db/$tb/".$idx->name."'>Drop</a>"))."</td></tr>";
 	}
 	echo "</table>";
