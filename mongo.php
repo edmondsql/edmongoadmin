@@ -5,7 +5,7 @@ session_name('Mongo');
 session_start();
 $bg=2;
 $step=20;
-$version="1.2";
+$version="1.3";
 class DBT {
 	private static $instance=NULL;
 	protected $_cnx,$db,$bw,$wc;
@@ -25,7 +25,7 @@ class DBT {
 		$qry=new MongoDB\Driver\Query($filter,$option);
 		return $this->_cnx->executeQuery($con,$qry)->toArray();
 	}
-	protected function prepare($time=1000) {
+	protected function prepare($time=5000) {
 		$this->wc=new MongoDB\Driver\WriteConcern(MongoDB\Driver\WriteConcern::MAJORITY,$time);
 		$this->bw=new MongoDB\Driver\BulkWrite;
 	}
@@ -52,7 +52,7 @@ class DBT {
 		return $result->getDeletedCount();
 	}
 	protected function execute($con) {
-		return $this->_cnx->executeBulkWrite($con,$this->bw,$this->wc);
+		return $this->_cnx->executeBulkWrite($con,$this->bw,[$this->wc]);
 	}
 	public function convert_id($doc,$oid='') {
 		if($doc instanceof MongoDB\BSON\ObjectId) {
