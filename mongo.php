@@ -5,7 +5,7 @@ session_name('Mongo');
 session_start();
 $bg=2;
 $step=20;
-$version="1.3";
+$version="1.4";
 class DBT {
 	private static $instance=NULL;
 	protected $_cnx,$db,$bw,$wc;
@@ -683,8 +683,12 @@ case "26"://drop collection
 	$db=$ed->sg[1];
 	$tb=$ed->sg[2];
 	$tbs=$ed->listCollection($db);
+	try {
 	$ed->con->commands($db,["drop"=>$tb]);
 	$ed->redir((count($tbs)<2?"":"5/$db"),['ok'=>"Successfully dropped"]);
+	} catch(Exception $e) {
+	$ed->redir("5/$db",['err'=>"Drop failed"]);
+	}
 break;
 
 case "30"://import
