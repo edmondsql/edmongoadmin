@@ -5,7 +5,7 @@ session_name('Mongo');
 session_start();
 $bg=2;
 $step=20;
-$version="1.4";
+$version="1.5";
 class DBT {
 	private static $instance=NULL;
 	protected $_cnx,$db,$bw,$wc;
@@ -77,7 +77,7 @@ class DBT {
 	}
 }
 class ED {
-	public $con,$sg,$path,$type,$deny=['admin','config','local'];
+	public $con,$sg,$path,$type,$cif='@#$',$deny=['admin','config','local'];
 	public function __construct() {
 		$pi=(isset($_SERVER['PATH_INFO']) ? $_SERVER['PATH_INFO'] : @getenv('PATH_INFO'));
 		$this->sg=preg_split('!/!',$pi,-1,PREG_SPLIT_NO_EMPTY);
@@ -132,39 +132,18 @@ class ED {
 		header('Location: '.$this->path.$way);exit;
 	}
 	public function enco($str) {
-		$salt=$_SERVER['HTTP_USER_AGENT'];
-		$count=strlen($str);
-		$str=(string)$str;
-		$kount=strlen($salt);
-		$x=0;$y=0;
-		$eStr="";
-		while($x < $count) {
-			$char=ord($str[$x]);
-			$keyS=is_numeric($salt[$y]) ? $salt[$y] : ord($salt[$y]);
-			$encS=$char + $keyS;
-			$eStr.=chr($encS);
-			++$x;++$y;
-			if($y==$kount) $y=0;
-		}
-		return base64_encode(base64_encode($eStr));
+		$salt = random_bytes(16);
+		$key = hash('sha256', $this->cif.$salt, true);
+		$encrypted = $str ^ str_repeat($key, ceil(strlen($str) / strlen($key)));
+		return base64_encode($salt . $encrypted);
 	}
 	public function deco($str) {
-		$salt=$_SERVER['HTTP_USER_AGENT'];
-		$str=base64_decode(base64_decode($str));
-		$count=strlen($str);
-		$str=(string)$str;
-		$kount=strlen($salt);
-		$x=0;$y=0;
-		$eStr="";
-		while($x < $count) {
-			$char=ord($str[$x]);
-			$keyS=is_numeric($salt[$y]) ? $salt[$y] : ord($salt[$y]);
-			$decS=$char - $keyS;
-			$eStr.=chr($decS);
-			++$x;++$y;
-			if($y==$kount) $y=0;
-		}
-		return $eStr;
+		$data = base64_decode($str, true);
+		if ($data === false || strlen($data) < 16) return false;
+		$salt = substr($data, 0, 16);
+		$cipher = substr($data, 16);
+		$key = hash('sha256', $this->cif.$salt, true);
+		return $cipher ^ str_repeat($key, ceil(strlen($cipher) / strlen($key)));
 	}
 	public function check($level=[],$param=[]) {
 		if(isset($_SESSION['token']) && !empty($_SESSION['user'])) {//check login
