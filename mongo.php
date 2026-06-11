@@ -1,11 +1,11 @@
 <?php
 error_reporting(E_ALL);
-if(!extension_loaded('mongodb')) die('Install Mongodb extension!');
+if(!extension_loaded('mongodb')) die('Install mongodb extension!');
 session_name('Mongo');
 session_start();
 $bg=2;
 $step=20;
-$version="1.5";
+$version="1.6";
 class DBT {
 	private static $instance=NULL;
 	protected $_cnx,$db,$bw,$wc;
@@ -132,18 +132,24 @@ class ED {
 		header('Location: '.$this->path.$way);exit;
 	}
 	public function enco($str) {
-		$salt = random_bytes(16);
-		$key = hash('sha256', $this->cif.$salt, true);
-		$encrypted = $str ^ str_repeat($key, ceil(strlen($str) / strlen($key)));
-		return base64_encode($salt . $encrypted);
+		$iv=random_bytes(16);
+		$key=hash_hmac('sha256',$iv,$this->cif,true);
+		while(strlen($key) < strlen($str)) $key .= hash_hmac('sha256',substr($key,-32),$this->cif,true);
+		$cipher=$str ^ substr($key,0,strlen($str));
+		$tag=hash_hmac('sha256',$iv.$cipher,$this->cif,true);
+		return base64_encode($iv.$tag.$cipher);
 	}
 	public function deco($str) {
-		$data = base64_decode($str, true);
-		if ($data === false || strlen($data) < 16) return false;
-		$salt = substr($data, 0, 16);
-		$cipher = substr($data, 16);
-		$key = hash('sha256', $this->cif.$salt, true);
-		return $cipher ^ str_repeat($key, ceil(strlen($cipher) / strlen($key)));
+		$data=base64_decode($str,true);
+		if($data===false || strlen($data)<48) return false;
+		$iv=substr($data,0,16);
+		$tag=substr($data,16,32);
+		$cipher=substr($data,48);
+		$expectedTag=hash_hmac('sha256',$iv.$cipher,$this->cif,true);
+		if(!hash_equals($expectedTag,$tag)) return false;
+		$key=hash_hmac('sha256',$iv,$this->cif,true);
+		while(strlen($key) < strlen($cipher)) $key .= hash_hmac('sha256',substr($key,-32),$this->cif,true);
+		return $cipher ^ substr($key,0,strlen($cipher));
 	}
 	public function check($level=[],$param=[]) {
 		if(isset($_SESSION['token']) && !empty($_SESSION['user'])) {//check login
